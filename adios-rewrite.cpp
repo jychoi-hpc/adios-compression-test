@@ -44,11 +44,13 @@ int main(int argc, char *argv[])
         std::vector<std::size_t> count;
         std::vector<double> val;
         std::vector<double> val2;
+        double t1, t2;
 
         adios2::ADIOS adios(configfile, MPI_COMM_WORLD, adios2::DebugON);
 
         // Reading
         adios2::IO reader_io = adios.DeclareIO("Reader");
+        t1 = MPI_Wtime();
         adios2::Engine reader = reader_io.Open(filename, adios2::Mode::Read);
         adios2::Variable<double> var_in = reader_io.InquireVariable<double>(varname);
         shape = var_in.Shape();
@@ -63,20 +65,28 @@ int main(int argc, char *argv[])
 
         reader.Get<double>(var_in, val);
         reader.Close();
+        t2 = MPI_Wtime();
+        std::cout << ">>> Raw-data loading time (sec): " << t2-t1 << std::endl;
 
         // Writing (for compression)
         adios2::IO writer_io = adios.DeclareIO("Writer");
+        t1 = MPI_Wtime();
         adios2::Engine writer = writer_io.Open(outfile, adios2::Mode::Write, MPI_COMM_WORLD);
         adios2::Variable<double> var2 = writer_io.DefineVariable<double>("out", shape, offset, count);
         writer.Put<double>(var2, val.data());
         writer.Close();
+        t2 = MPI_Wtime();
+        std::cout << ">>> Writing time (sec): " << t2-t1 << std::endl;
 
         // Reading back (for decompression)
         adios2::IO reader2_io = adios.DeclareIO("Reader2");
+        t1 = MPI_Wtime();
         adios2::Engine reader2 = reader2_io.Open(outfile, adios2::Mode::Read);
         adios2::Variable<double> var_in2 = reader2_io.InquireVariable<double>("out");
         reader2.Get<double>(var_in2, val2);
         reader2.Close();
+        t2 = MPI_Wtime();
+        std::cout << ">>> Re-reading time (sec): " << t2-t1 << std::endl;
 
         // next work: we can calculate errors here
     }
