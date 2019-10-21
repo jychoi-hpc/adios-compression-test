@@ -23,4 +23,38 @@ Here is an example:
 ```
 
 In the above command, it will read `dpot` variable in `xgc.3d.00304.bp` and write to `out.bp`. It requires an adios xml file (`adios2.cfg`). 
-To test with compression, comment out compression section in `adios2.xml`
+To test with compression, comment out compression section in `adios2.xml`. An example is as follows:
+
+```
+<?xml version="1.0"?>
+<adios-config>
+
+    <!--============================================
+           Reader
+        ============================================-->
+
+    <io name="Reader">
+        <engine type="BP4">
+        </engine>
+    </io>
+
+    <!--===========================================
+           Writer
+        ===========================================-->
+
+    <io name="Writer">
+        <engine type="BP4">
+        </engine>
+
+        <!-- Compress variables -->
+        <!-- variable name "out" is fixed -->
+        <variable name="out">
+            <operation type="mgard">
+                <parameter key="accuracy" value="0.01"/>
+                <parameter key="gpu" value="1"/>
+            </operation>
+        </variable>
+    </io>
+
+</adios-config>
+```
