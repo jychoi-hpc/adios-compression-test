@@ -2,11 +2,11 @@
  * Distributed under the OSI-approved Apache License, Version 2.0.  See
  * accompanying file Copyright.txt for details.
  *
- * helloBPReader.cpp: Simple self-descriptive example of how to read a variable
+ * helloreader.cpp: Simple self-descriptive example of how to read a variable
  * to a BP File.
  *
  * Try running like this from the build directory:
- *   mpirun -np 3 ./bin/hello_bpReader
+ *   mpirun -np 3 ./bin/hello_reader
  *
  *  Created on: Feb 16, 2017
  *      Author: William F Godoy godoywf@ornl.gov
@@ -21,85 +21,53 @@
 
 int main(int argc, char *argv[])
 {
+    // Check arguments
+    if (argc < 4) {
+        std::cerr << "Usage: " << argv[0] << " filename variable outfile" << std::endl;
+        return 1;
+    }
+
     MPI_Init(&argc, &argv);
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     
-    std::string filename = "myVector_cpp.bp";
+    std::string filename = argv[1];
+    std::string varname = argv[2];
+    std::string outfile = argv[3];
+
     try
     {
-        /** ADIOS class factory of IO class objects, DebugON is recommended */
+        std::vector<std::size_t> shape;
+        std::vector<std::size_t> offset;
+        std::vector<std::size_t> count;
+        std::vector<double> val;
+
+        // Reading
         adios2::ADIOS adios(MPI_COMM_WORLD, adios2::DebugON);
-
-        /*** IO class object: settings and factory of Settings: Variables,
-         * Parameters, Transports, and Execution: Engines */
-        adios2::IO bpIO = adios.DeclareIO("ReadBP");
-
-        /** Engine derived class, spawned to start IO operations */
-        adios2::Engine bpReader = bpIO.Open(filename, adios2::Mode::Read);
-
-        const std::map<std::string, adios2::Params> variables =
-            bpIO.AvailableVariables();
-
-        for (const auto variablePair : variables)
+        adios2::IO reader_io = adios.DeclareIO("ReadBP");
+        
+        adios2::Engine reader = reader_io.Open(filename, adios2::Mode::Read);
+        adios2::Variable<double> var_in = reader_io.InquireVariable<double>(varname);
+        shape = var_in.Shape();
+        offset = shape;
+        count = shape;
+        // we assume using only a single process
+        for (int i=0; i<shape.size(); i++) 
         {
-            std::cout << "Name: " << variablePair.first;
-
-            for (const auto &parameter : variablePair.second)
-            {
-                std::cout << "\t" << parameter.first << ": " << parameter.second
-                          << "\n";
-            }
+            offset[i] = 0;
+            count[i] = shape[i];
         }
 
-        /** Write variable for buffering */
-        adios2::Variable<float> bpFloats =
-            bpIO.InquireVariable<float>("bpFloats");
-        adios2::Variable<int> bpInts = bpIO.InquireVariable<int>("bpInts");
+        reader.Get<double>(var_in, val);
+        reader.Close();
 
-        const std::size_t Nx = 10;
-        if (bpFloats) // means found
-        {
-            std::vector<float> myFloats;
-
-            // read only the chunk corresponding to our rank
-            bpFloats.SetSelection({{Nx * rank}, {Nx}});
-            // myFloats.data is pre-allocated
-            bpReader.Get<float>(bpFloats, myFloats, adios2::Mode::Sync);
-
-            if (rank == 0)
-            {
-                std::cout << "MyFloats: \n";
-                for (const auto number : myFloats)
-                {
-                    std::cout << number << " ";
-                }
-                std::cout << "\n";
-            }
-        }
-
-        if (bpInts) // means not found
-        {
-            std::vector<int> myInts;
-            // read only the chunk corresponding to our rank
-            bpInts.SetSelection({{Nx * rank}, {Nx}});
-
-            bpReader.Get<int>(bpInts, myInts, adios2::Mode::Sync);
-
-            if (rank == 0)
-            {
-                std::cout << "myInts: \n";
-                for (const auto number : myInts)
-                {
-                    std::cout << number << " ";
-                }
-                std::cout << "\n";
-            }
-        }
-
-        /** Close bp file, engine becomes unreachable after this*/
-        bpReader.Close();
+        // Write
+        adios2::IO writer_io = adios.DeclareIO("WriteBP");
+        adios2::Engine writer = writer_io.Open(outfile, adios2::Mode::Write, MPI_COMM_WORLD);
+        adios2::Variable<double> var2 = writer_io.DefineVariable<double>(varname, shape, offset, count);
+        writer.Put<double>(var2, val.data());
+        writer.Close();
     }
     catch (std::invalid_argument &e)
     {
