@@ -32,6 +32,7 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     
+    std::string configfile = "adios2.xml";
     std::string filename = argv[1];
     std::string varname = argv[2];
     std::string outfile = argv[3];
@@ -42,11 +43,12 @@ int main(int argc, char *argv[])
         std::vector<std::size_t> offset;
         std::vector<std::size_t> count;
         std::vector<double> val;
+        std::vector<double> val2;
+
+        adios2::ADIOS adios(configfile, MPI_COMM_WORLD, adios2::DebugON);
 
         // Reading
-        adios2::ADIOS adios(MPI_COMM_WORLD, adios2::DebugON);
-        adios2::IO reader_io = adios.DeclareIO("ReadBP");
-        
+        adios2::IO reader_io = adios.DeclareIO("Reader");
         adios2::Engine reader = reader_io.Open(filename, adios2::Mode::Read);
         adios2::Variable<double> var_in = reader_io.InquireVariable<double>(varname);
         shape = var_in.Shape();
@@ -62,12 +64,21 @@ int main(int argc, char *argv[])
         reader.Get<double>(var_in, val);
         reader.Close();
 
-        // Write
-        adios2::IO writer_io = adios.DeclareIO("WriteBP");
+        // Writing (for compression)
+        adios2::IO writer_io = adios.DeclareIO("Writer");
         adios2::Engine writer = writer_io.Open(outfile, adios2::Mode::Write, MPI_COMM_WORLD);
-        adios2::Variable<double> var2 = writer_io.DefineVariable<double>(varname, shape, offset, count);
+        adios2::Variable<double> var2 = writer_io.DefineVariable<double>("out", shape, offset, count);
         writer.Put<double>(var2, val.data());
         writer.Close();
+
+        // Reading back (for decompression)
+        adios2::IO reader2_io = adios.DeclareIO("Reader2");
+        adios2::Engine reader2 = reader2_io.Open(outfile, adios2::Mode::Read);
+        adios2::Variable<double> var_in2 = reader2_io.InquireVariable<double>("out");
+        reader2.Get<double>(var_in2, val2);
+        reader2.Close();
+
+        // next work: we can calculate errors here
     }
     catch (std::invalid_argument &e)
     {

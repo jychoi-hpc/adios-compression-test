@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<adios-config>
+
+    <!--============================================
+           Reader
+        ============================================-->
+
+    <io name="Reader">
+        <engine type="BP4">
+        </engine>
+    </io>
+
+    <!--===========================================
+           Writer
+        ===========================================-->
+
+    <io name="Writer">
+        <engine type="BP4">
+        </engine>
+
+        <!-- Compress variables -->
+        <!-- variable name "out" is fixed -->
+        <!--
+        <variable name="out">
+            <operation type="mgard">
+                <parameter key="accuracy" value="0.01"/>
+                <parameter key="gpu" value="1"/>
+            </operation>
+        </variable>
+        -->
+    </io>
+
+</adios-config>
+
